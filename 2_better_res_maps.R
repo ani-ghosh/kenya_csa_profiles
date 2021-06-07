@@ -2,14 +2,60 @@ library(tidyverse)
 library(cowplot)
 library(fst)
 library(ggthemes)
+library(raster)
+library(tmap)
+library(tmaptools)
+
 # library(showtext)
-library(extrafont)
-# font_import()
-loadfonts(device = "win")
+# library(extrafont)
+# # font_import()
+# loadfonts(device = "win")
+
+fill.na <- function(x, i=5) {
+  if( is.na(x)[i] ) {
+    return( round(mean(x, na.rm=TRUE),0) )
+  } else {
+    return( round(x[i],0) )
+  }
+}  
+
 
 
 makeCountyPlot <- function(county, ff, datadir){
   cat("Plotting", county, "\n")
+  
+  # process spatial data
+  v1 <- v[v$NAME_1 == county,]
+  r1 <- crop(r, v1)
+  r1 <- mask(r1, v1)
+  
+  x <- read.fst(file.path(datadir, "Vihiga_2021_2045_corrected.fst"))
+  
+  x1 <- x %>%
+    dplyr::select(-c(ISO3, Country, county)) %>%
+    dplyr::filter(season == "s1") %>%
+    group_by(id, season) %>%
+    summarise_all(mean, na.rm = TRUE) %>%
+    ungroup() %>%
+    dplyr::select(-c(id, season, year))
+  coordinates(x1) <- ~x+y
+  gridded(x1) <- TRUE  
+  r1x <- raster(x1)
+  r1x <- extend(r1x, extent(v1)*1.25, value=NA)
+  r11 <- focal(r1x, w = matrix(1,3,3), fun = fill.na, 
+              pad = TRUE, na.rm = FALSE )
+  r2x <- cover(r1x, r11)
+  r2x <- resample(r2x, r1)
+  
+  
+  plot(r2x)
+  plot(v1, add = T)
+  # unique latlonid
+  # ill <- x[,c("id", "x", "y")] %>% filter(duplicated(.))
+  
+  # https://github.com/CIAT-DAPA/GIZ-climate-hazards/blob/2e7fac81eea636d5c5974db3bb04ff5d5706d47d/climate_scripts/09_graphs_do_maps.R
+  # https://github.com/CIAT-DAPA/GIZ-climate-hazards/blob/2e7fac81eea636d5c5974db3bb04ff5d5706d47d/climate_scripts/10_do_elevation_map.R
+  
   f <- grep(county, ff, value = TRUE)
   f1 <- grep("past", f, value = TRUE) 
   
@@ -17,12 +63,11 @@ makeCountyPlot <- function(county, ff, datadir){
   
   # summarize data
   d1 <- d1 %>% 
-    select(-id) %>%
-    group_by(year, season) %>%
-    summarise_all(c("mean", "sd"), na.rm = TRUE) %>%
-    mutate(season = case_when(
-      season == "s1" ~ "Long Rain",
-      season == "s2" ~ "Short Rain"))
+    group_by(id, season) %>%
+    summarise_all(mean, na.rm = TRUE)
+  
+  d1s1 <- d1[d1$season == "s1",]
+  d1s1 <- merge(x, d1s1, by = "id")
   
   # future barplots
   # f2 <- grep("future", f, value = TRUE) 
@@ -177,13 +222,12 @@ makeCountyPlot <- function(county, ff, datadir){
 }
 
 
-
 datadir <- "G:/My Drive/work/ciat/climate_risk_profiles/kenya_counties/data"
 
 ff <- list.files(datadir, pattern = "_special.fst$", full.names = T, recursive = T)
 
+r <- getData('alt', country='KEN', path = datadir)
+v <- getData('GADM', country='KEN', level=1, path = datadir)
+
 # make line plots for past
 countylist <- unique(sapply(strsplit(basename(ff), "_"), "[[", 1))
-# county <- "Vihiga"
-
-lapply(countylist, makeCountyPlot, ff, datadir)
