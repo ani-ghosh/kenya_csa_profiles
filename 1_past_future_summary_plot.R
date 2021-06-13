@@ -3,9 +3,9 @@ library(cowplot)
 library(fst)
 library(ggthemes)
 # library(showtext)
-library(extrafont)
-# font_import()
-loadfonts(device = "win")
+# library(extrafont)
+# # font_import()
+# loadfonts(device = "win")
 
 
 makeCountyPlot <- function(county, ff, datadir){

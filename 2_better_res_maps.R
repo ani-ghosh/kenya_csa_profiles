@@ -21,6 +21,7 @@ fill.na <- function(x, i=5) {
 
 
 
+
 makeCountyPlot <- function(county, ff, datadir){
   cat("Plotting", county, "\n")
   
@@ -224,7 +225,7 @@ makeCountyPlot <- function(county, ff, datadir){
 
 datadir <- "G:/My Drive/work/ciat/climate_risk_profiles/kenya_counties/data"
 
-ff <- list.files(datadir, pattern = "_special.fst$", full.names = T, recursive = T)
+ff <- list.files(datadir, pattern = "_corrected.fst$", full.names = T, recursive = T)
 
 r <- getData('alt', country='KEN', path = datadir)
 v <- getData('GADM', country='KEN', level=1, path = datadir)
