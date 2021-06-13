@@ -1,7 +1,8 @@
 # combine data from the two different set of files
+library(raster)
+library(rasterVis)
 library(fst)
 library(tidyverse)
-library(raster)
 library(tmap)
 library(tmaptools)
 
@@ -13,8 +14,6 @@ fill.na <- function(x, i=5) {
   }
 } 
 
-r <- getData('alt', country='KEN', path = datadir)
-v <- getData('GADM', country='KEN', level=1, path = datadir)
 
 readfile <- function(x){
   models <- c("ipsl_cm5a_mr","miroc_esm_chem","ncc_noresm1_m","past")
@@ -24,7 +23,7 @@ readfile <- function(x){
   return(d)
 }
 
-makeCountyRaster <- function(d, cbound, celev){
+makeCountyRaster <- function(d, v1, r1){
   coordinates(d) <- ~x+y
   gridded(d) <- TRUE  
   rd <- raster(d)
@@ -39,6 +38,8 @@ makeCountyRaster <- function(d, cbound, celev){
 
 datadir <- "G:/My Drive/work/ciat/climate_risk_profiles/kenya_counties/data"
 
+r <- getData('alt', country='KEN', path = datadir)
+v <- getData('GADM', country='KEN', level=1, path = datadir)
 ss <- list.files(datadir, pattern = "_special.fst$", full.names = T, recursive = T)
 ff <- list.files(datadir, pattern = "_corrected.fst$", full.names = T, recursive = T)
 
@@ -49,12 +50,17 @@ periods <- c("1985_2015", "2021_2045", "2041_2065")
 # county functions
 cat("Prepping", county, "\n")
 
-r <- getData('alt', country='KEN', path = datadir)
-v <- getData('GADM', country='KEN', level=1, path = datadir)
-
 # process spatial data
 cbound <- v[v$NAME_1 == county,]
-celev <- crop(r, v1)
+celev <- crop(r, cbound)
+
+shp_sf <- cbound %>% sf::st_as_sf()
+country <- v %>% sf::st_as_sf()
+xlims <- sf::st_bbox(shp_sf)[c(1, 3)]
+ylims <- sf::st_bbox(shp_sf)[c(2, 4)]
+
+vfort <- fortify(v)
+cboundfort <- fortify(cbound)
 
 combineInd <- function(county){}
 s <- grep(county, ss, value = TRUE)
@@ -123,33 +129,6 @@ gs1 <- stack(gs1)
 
 gs11 <- gs1[[1:3]]
 
-absmap <- tm_shape(gs11) +
-  tm_raster(style = "cont", palette = "Blues", legend.show = T, legend.is.portrait = FALSE) +
-  tm_layout(frame = T, 
-            legend.outside = TRUE, legend.outside.position = "bottom", legend.outside.size = 0.1, 
-            legend.position = c("center", "bottom")) +
-  tm_facets(sync = TRUE, ncol = 3)
-absmap
-# plot(gs11[["layer.1"]], add=T, legend.only = T, horizontal = T, legend.shrink=0.66, 
-#      smallplot=c(0.1,0.9, 0.1, 0.15), col=terrain.colors(50))
-
-absmaplegend <- tm_shape(gs11) +
-  tm_raster(style = "cont", palette = "Blues", legend.is.portrait = FALSE) +
-  tm_layout(panel.show = FALSE,
-    legend.only = TRUE,
-    legend.outside = TRUE,
-    legend.outside.position = "top",
-    legend.outside.size = 1,
-    legend.bg.color = "transparent",
-    legend.bg.alpha = 1)
-pp <-  tmap_arrange(absmap, absmaplegend, nrow = 2, heights = c(0.8, 0.2))
-pp
-
-# tmaptools::palette_explorer()
-
-
-
-
 limits_two <- two_index %>% group_by(gSeason) %>%
   dplyr::select(SLGP, LGP) %>% summarise_all(.funs = c('min', 'max')) %>% 
   ungroup()
@@ -160,18 +139,61 @@ my_breaks <- round(seq(my_limits[1], my_limits[2],  length.out= 3), 0)
 my_limits <- c(ifelse(my_limits[1] > my_breaks[1], my_breaks[1], my_limits[1]) ,ifelse(my_limits[2] < my_breaks[3], my_breaks[3], my_limits[2]))
 
 
-SLGP_p_1 <- ggplot(filter(two_index %>% mutate(gSeason = glue::glue('gSeason = {gSeason}')),
-                          era == '1985-2015', gSeason == glue::glue('gSeason = {i}'))) +
-  geom_tile(aes(x = x, y = y, fill = SLGP))  +
-  labs(fill = glue::glue('SLGP\n(Day of\nthe year)  '), 
-       title = glue::glue('gSeason = {i}; Historic'),
+
+pfill <- glue::glue('SLGP\n(Day of\nthe year)  ')
+ptitle <- glue::glue('gSeason = {i}')
+
+absmap <- gplot(gs11) + geom_tile(aes(fill = value)) +
+  facet_wrap(~ variable) +
+  geom_path(data = vfot, aes(x = long, y = lat, group = group), 
+              color = gray(0.8), size = 0.1) +
+  geom_path(data = cboundfort, aes(x = long, y = lat, group = group), 
+            color = gray(0.1), size = 0.1) +
+  coord_sf(xlim = xlims, ylim = ylims) +
+  labs(fill = pfill, 
+       title = ptitle,
        x = 'Longitude', y = 'Latitude') +
-  scale_fill_viridis_c(limits =  my_limits, 
-                       breaks = my_breaks, 
+  scale_fill_viridis_c(limits =  my_limits, breaks = my_breaks, na.value = NA,
                        guide = guide_colourbar(barwidth = 20, label.theme = element_text(angle = 25, size = 35))) +
-  # scale_y_continuous(breaks = round(ylims, 2), n.breaks = 3) +
-  # scale_x_continuous(breaks = round(xlims, 2), n.breaks = 3) +
-  theme_bw() + theme(legend.position = 'bottom', text = element_text(size=35), 
-                     legend.title=element_text(size=35), 
-                     legend.spacing = unit(5, units = 'cm'),
-                     legend.spacing.x = unit(1.0, 'cm'), plot.title = element_text(hjust = 0.5)) 
+  scale_y_continuous(breaks = round(ylims, 2), n.breaks = 3) +
+  scale_x_continuous(breaks = round(xlims, 2), n.breaks = 3) +
+  theme_bw() + 
+  theme(line = element_blank(),
+    legend.position = 'bottom', text = element_text(size=35), 
+        legend.title=element_text(size=35), 
+        legend.spacing = unit(5, units = 'cm'),
+        legend.spacing.x = unit(1.0, 'cm'), plot.title = element_text(hjust = 0.5)) 
+
+
+gs12 <- gs1[[4:5]]
+dt_MM <- slgp1$dif1
+
+my_limits_MM <- c(min(dt_MM)-1, max(dt_MM)+1)
+my_breaks_MM <- round(seq(my_limits_MM[1], my_limits_MM[2],  length.out= 3), 0)
+my_limits_MM <- c(ifelse(my_limits_MM[1] > my_breaks_MM[1], my_breaks_MM[1], my_limits_MM[1]) ,ifelse(my_limits_MM[2] < my_breaks_MM[3], my_breaks_MM[3], my_limits_MM[2]))
+
+
+chgmap <- gplot(gs12) + geom_tile(aes(fill = value)) +
+  facet_wrap(~ variable) +
+  geom_path(data = fortify(v), aes(x = long, y = lat, group = group), 
+            color = gray(0.8), size = 0.1) +
+  geom_path(data = fortify(cbound), aes(x = long, y = lat, group = group), 
+            color = gray(0.1), size = 0.1) +
+  coord_sf(xlim = xlims, ylim = ylims) +
+  labs(fill = pfill, 
+       title = ptitle,
+       x = 'Longitude', y = 'Latitude') +
+  scale_fill_gradient2(limits =  my_limits_MM, 
+                       breaks = my_breaks_MM,
+                       na.value = NA,
+                       low = '#A50026', mid = 'white', high = '#000099', 
+                       guide = guide_colourbar(barwidth = 20, label.theme = element_text(angle = 25, size = 35))) +
+  scale_y_continuous(breaks = round(ylims, 2), n.breaks = 3) +
+  scale_x_continuous(breaks = round(xlims, 2), n.breaks = 3) +
+  theme_bw() + 
+  theme(line = element_blank(),
+        legend.position = 'bottom', text = element_text(size=35), 
+        legend.title=element_text(size=35), 
+        legend.spacing = unit(5, units = 'cm'),
+        legend.spacing.x = unit(1.0, 'cm'), plot.title = element_text(hjust = 0.5)) 
+chgmap
