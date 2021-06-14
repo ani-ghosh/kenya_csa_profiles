@@ -1,3 +1,21 @@
+datadir <- "G:/My Drive/work/ciat/climate_risk_profiles/kenya_counties/data"
+
+# vector boundaries
+# gadm boundary
+vg <- getData('GADM', country='KEN', level=1, path = datadir)
+# IEBC boundary
+ve <- shapefile(file.path(datadir, "ken_adm_iebc_20191031_shp/ken_admbnda_adm1_iebc_20191031.shp"))
+clist <- c("Bungoma","Kiambu","Kirinyaga","Kisii","Kitui","Migori",     
+           "Murang'a","Nandi","Narok","Nyamira","Samburu","Trans Nzoia","Turkana","Vihiga")
+v <- ve[ve$ADM1_EN %in% clist, ]
+# reading global elevation because of disputed areas
+# r <- stack("G:/My Drive/work/ciat/eia/analysis/input/elevation/wc2.1_30s_elev.tif")
+# # crop to Kenya iebc boundary
+# r <- crop(r, extent(v)*1.1, filename = file.path(datadir, "kenya_elevation_1km.tif"), overwrite = TRUE)
+r <- stack(file.path(datadir, "kenya_elevation_1km.tif"))
+r <- crop(r, v)
+elev <- mask(r, v)
+
 # create a list for variable and palette
 varCol <- data.frame(vars = c("CDD","P5D","P95","NT35","ndws","ATR","AMT","SLGP", "LGP"),
                      gradlow = c("#000099", "#A50026", "#A50026", "#000099", "#000099", 
@@ -32,7 +50,7 @@ makePlotCounty <- function(i, varCol, county, season, v, elev, rr, datadir){
   cdir <- file.path(datadir, "combined_data/interim", county)
   dir.create(cdir, F, T)
   ofile <- file.path(cdir, paste0(county, "_", var$vars,"_",season, ".tif"))
-  unlink(ofile)
+  # unlink(ofile)
   if(!file.exists(ofile)){
     rv <- grep(paste0("_",var$vars, "_"), rr, value = TRUE)
     rvs <- grep(paste0("_",season), rv, value = TRUE )
@@ -56,8 +74,7 @@ makePlotCounty <- function(i, varCol, county, season, v, elev, rr, datadir){
   # maps
   p1 <- makeAbsoluteMap(gs, var, vfort, cboundfort, xlims, ylims)
   
-  p2 <- makeChangeMap(gs, var, vfort, cboundfort, xlims, ylims) + theme(axis.title.y = element_blank(),  
-                                                                        axis.text.y = element_blank())
+  p2 <- makeChangeMap(gs, var, vfort, cboundfort, xlims, ylims) 
 
   if (var$vars %in% c("SLGP", "LGP")){
     fseason <- case_when(
@@ -70,26 +87,27 @@ makePlotCounty <- function(i, varCol, county, season, v, elev, rr, datadir){
   }
   
   # merge 
-  pp <- p1 + p2 + 
+  pp <- p1 + theme(plot.margin = unit(c(0.5,0,1,0), "in")) +
+    p2 + 
     plot_annotation(title = paste(county, var$vars, "for", fseason),
                                   caption = 'Alliance of Bioversity and CIAT',
-                                  theme = theme(plot.title = element_text(size = 35))) +
-    plot_layout(ncol = 2, widths = c(0.6, 0.4))
+                                  theme = theme(plot.title = element_text(size = 50))) +
+    plot_layout(nrow = 2, heights = c(0.55, 0.45))
   
   pdir <- file.path(datadir, "combined_data/finalplots", county)
   dir.create(pdir, F, T)
   
-  ggsave(file.path(pdir, paste0(county,"_", var, "_", fseason, ".png")), pp, device = "png",
-         width = 24, height = 11, units = "in")
+  ggsave(file.path(pdir, paste0(county,"_", var$vars, "_", fseason, ".png")), pp, device = "png",
+         width = 18, height = 24, units = "in")
   
 }
 
-varCol <- varCol[varCol$vars %in% c("LGP", "SLGP"),]
+# varCol <- varCol[varCol$vars %in% c("LGP", "SLGP"),]
 # all plots in for loop
 for(county in clist){{
   for (season in seasons){
     for (i in 1:nrow(varCol)){
-      cat("Processing", i, county, season)
+      # cat("Processing", i, county, season)
       makePlotCounty(i, varCol, county, season, v, elev, rr, datadir) 
     }
   }

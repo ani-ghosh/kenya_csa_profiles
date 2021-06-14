@@ -9,6 +9,7 @@ library(tmaptools)
 library(patchwork)
 library(grid)
 library(fields)
+library(classInt)
 
 # read each models
 readfile <- function(x){
@@ -104,10 +105,14 @@ thememap <- function(...){
         axis.title = element_text(size = 25),
         strip.text = element_text(size = 30),
         legend.position = 'bottom', 
+        legend.justification="center",
         legend.title = element_text(size = 30),
-        legend.text = element_text(size = 25),
-        legend.spacing = unit(5, units = 'cm'),
-        legend.spacing.x = unit(1.0, 'cm'), plot.title = element_text(hjust = 0.5),
+        legend.text = element_text(size = 25, margin = margin(0, 5, 0, 5)),
+        legend.margin = margin(0, 0, 0, 0),
+        legend.title.align = 0.5,
+        legend.spacing.x = unit(0.5, "in"),
+        # legend.spacing = unit(5, units = 'cm'),
+        # plot.title = element_text(hjust = 0.5),
           ...
   ) 
 }
@@ -122,12 +127,17 @@ makeAbsoluteMap <- function(gs, var, vfort, cboundfort, xlims, ylims, ...){
   gs <- raster::stack(gs1, gs2, gs3)
   names(gs) <- c("b1", "b2", "b3")
   # color breaks and limits
-  mv <- min(cellStats(gs, 'min', na.rm = T))
+  mn <- min(cellStats(gs, 'min', na.rm = T))
   mx <- max(cellStats(gs, 'max', na.rm = T))          
-  my_limits <- c(round(mv*0.9,0), round(mx*1.1, 0))
+  my_limits <- c(round(mn,0), round(mx, 0))
+  
+  # cint <- classIntervals(values(gs), 10, style = "quantile")
+  # my_breaks <- round(cint$brks, 0)
+  # nb <- length(my_breaks)
+  # my_labels <- my_breaks[c(1, round(nb/2, 0), nb)]
   my_breaks <- round(seq(my_limits[1], my_limits[2],  length.out = 3), 0)
   my_limits <- c(ifelse(my_limits[1] > my_breaks[1], my_breaks[1], my_limits[1]),
-                 ifelse(my_limits[2] < my_breaks[3], my_breaks[3], my_limits[2]))
+                  ifelse(my_limits[2] < my_breaks[3], my_breaks[3], my_limits[2]))
   
   # setup color palette
   if(var$vars %in% c("P5D","P95","ATR","SLGP", "LGP")){
@@ -135,23 +145,26 @@ makeAbsoluteMap <- function(gs, var, vfort, cboundfort, xlims, ylims, ...){
                                 breaks = unique(my_breaks),
                                 labels = unique(my_breaks),
                                 colours = blues9, 
+                                oob = scales::oob_squish,
                                 na.value = NA,
-                                guide = guide_colourbar(barwidth = 25, 
+                                guide = guide_colourbar(barwidth = 30, 
                                                         label.theme = element_text(angle = 25, size = 35)))
   } else if(var$vars == 'AMT'){
     my_palette <- scale_fill_gradient(limits =  my_limits, 
                                breaks = unique(my_breaks),
                                labels = unique(my_breaks),
                                low = "yellow", high = "red",
+                               oob = scales::oob_squish,
                                na.value = NA,
-                               guide = guide_colourbar(barwidth = 25,  
+                               guide = guide_colourbar(barwidth = 30,  
                                                        label.theme = element_text(angle = 25, size = 35)))
   } else {
     my_palette <- scale_fill_viridis_c(limits = my_limits, 
                                 breaks = unique(my_breaks),
                                 labels = unique(my_breaks),
+                                oob = scales::oob_squish,
                                 na.value = NA,
-                                guide = guide_colourbar(barwidth = 20, 
+                                guide = guide_colourbar(barwidth = 30, 
                                                         label.theme = element_text(angle = 25, size = 35))) 
   }
   
@@ -189,6 +202,8 @@ makeChangeMap <- function(gs, var, vfort, cboundfort, xlims, ylims, ...){
   
   # color breaks and limits
   my_limits_MM <- c(min(cellStats(gs, 'min', na.rm = T)), max(cellStats(gs, 'max', na.rm = T)))
+  # cint <- classIntervals(values(gs), 2, style = "quantile")
+  # my_breaks_MM <- round(cint$brks, 0)
   my_breaks_MM <- round(seq(my_limits_MM[1], my_limits_MM[2],  length.out= 3), 0)
   my_limits_MM <- c(ifelse(my_limits_MM[1] > my_breaks_MM[1], my_breaks_MM[1], my_limits_MM[1]),
                     ifelse(my_limits_MM[2] < my_breaks_MM[3], my_breaks_MM[3], my_limits_MM[2]))
@@ -207,13 +222,14 @@ makeChangeMap <- function(gs, var, vfort, cboundfort, xlims, ylims, ...){
     scale_y_continuous(breaks = round(ylims, 2), n.breaks = 3) +
     scale_x_continuous(breaks = round(xlims, 2), n.breaks = 3) +
     thememap() +
-    labs(fill = paste0("Change in \n", var$labs), 
+    labs(fill = paste0("Change in ", var$labs), 
          x = 'Longitude', y = 'Latitude') +
     scale_fill_gradient2(limits =  my_limits_MM, 
                          breaks = my_breaks_MM,
+                         oob = scales::oob_squish,
                          na.value = NA,
                          low = var$gradlow, mid = var$gradmid, high = var$gradhigh, 
-                         guide = guide_colourbar(barwidth = 20, 
+                         guide = guide_colourbar(barwidth = 25, 
                                                  label.theme = element_text(angle = 25, size = 35)))
   return(chgmap)
 }
