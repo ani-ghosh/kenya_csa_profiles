@@ -336,6 +336,55 @@ for(county in clist){
 }
 
 
+#######################################################################################################
+iso <- "NGA"
+# datadir <- "G:/My Drive/work/ciat/climate_risk_profiles/PAK/CMIP6/baloch/"
+# datadir <- "C:/Users/anibi/Documents/ciat/cmip6"
+# ff <- list.files(datadir, pattern = "^NGA.*tif$", full.names = T, recursive = T)
+datadir <- "G:/My Drive/work/ciat/climate_risk_profiles/NIRSAL/NIRSAL/combined_data"
+ff <- list.files(datadir, pattern = glob2rx(paste("interpolated","tif",sep="*")), 
+                 full.names = T, recursive = T)
+
+cur <- rast(grep("1985.2015", ff, value = TRUE))
+
+gcm <- c("ACCESS-CM2", "INM-CM5-0", "HadGEM3-GC31-LL", "IPSL-CM6A-LR", "CNRM-CM6-1-HR")
+gcms <- paste(gcm, collapse = "|")
+fut <- grep(gcms, ff, value = TRUE)
+# create a stack of historical and future variables
+
+# mean of 2030
+fut1 <- rast(grep("2021-2040", fut, value = TRUE))
+fut1 <-  subset(fut1, grep("wc2_1$|wc2_12$", names(fut1)))
+fut1 <- tapp(fut1, index = c(1,2), fun = mean, na.rm = TRUE)
+
+# mean of 2050
+fut2 <- rast(grep("2041-2060", ff, value = TRUE))
+fut2 <-  subset(fut2, grep("wc2_1$|wc2_12$", names(fut2)))
+fut2 <- tapp(fut2, index = c(1,2), fun = mean, na.rm = TRUE)
+
+# combine all and rename
+rr <- c(cur, fut1, fut2)
+names(rr) <- apply(expand.grid(c("AMT_", "ATR_"), c("historical", "2030", "2050")), 1, paste, collapse="")
+writeRaster(rr, file.path(datadir, paste0(iso, "_all_bio1_bio12.tif")), overwrite = TRUE)
+
+# admin boundaries
+vg <- getData('GADM', country='NGA', level=1, path = datadir)
+clist <- c("Adamawa","Borno","Yobe")
+
+# subset climate data by roi
+rr <- stack(file.path(datadir, paste0(iso, "_all_bio1_bio12.tif")))
+
+for(county in clist){
+  {
+    for (var in c("AMT", "ATR")){
+      makePlotCounty(var, county, varcol, v, rr, datadir) 
+    }
+  }
+}
+
+
+
+
 # summary plot for AMT and ATR
 library(tidyverse)
 library(cowplot)
