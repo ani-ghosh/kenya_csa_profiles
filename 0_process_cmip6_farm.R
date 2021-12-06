@@ -7,13 +7,13 @@ library(raster)
 
 # processing in FARM
 ssp <- "585"
-res <- "30s"
-var <- "wc2.1_30s_bioc_"
-period <- c("2021-2040", "2041-2060")
+res <- "2.5"
+var <- "wc2.1_2.5m_bioc_"
+period <- c("2021-2040", "2041-2060", "2061-2080")
 
-# iso <- c("NGA", "SEN", "NER", "MLI", "ETH", "KEN")
-iso <- c("MLI", "ETH", "KEN")
-datadir <- "/group/rhijmansgrp/spatial04/worlclim/cmip6/7_fut"
+iso <- c("SEN", "NER", "MLI")
+# iso <- c("MLI", "ETH", "KEN")
+datadir <- "/group/rhijmansgrp/spatial04/worldclim/cmip6/7_fut"
 tdir <- "/share/spatial02/users/anighosh/worldclim"
 
 ff <- list.files(datadir, pattern = var, 
@@ -21,17 +21,17 @@ ff <- list.files(datadir, pattern = var,
 ff <- grep(ff, pattern = ssp, value = TRUE)
 ff <- grep(ff, pattern = paste(period, collapse = "|"), value = TRUE)
 
-cropByGeometry <- function(f, iso3, tdir){
+cropByGeometry <- function(f, iso3, tdir, res){
   r <- rast(f)
   v <- getData('GADM', country=iso3, level=0, path=tdir)
   v <- vect(v)
   
-  odir <- file.path(tdir, "cmip6")
+  odir <- file.path(tdir, "cmip6", res)
   dir.create(odir, FALSE, TRUE)
   
   ofile <- file.path(odir, paste0(iso3, "_" ,basename(f)))
   if(!file.exists(ofile)){
-    r <- crop(r, v)
+    r <- crop(r, v, snap = "out")
     r <- mask(r, v, filename = ofile, overwrite=TRUE, gdal=c("COMPRESS=LZW"))
   }
   return(NULL)
@@ -39,7 +39,7 @@ cropByGeometry <- function(f, iso3, tdir){
   
 for (iso3 in iso){
   cat("processing", iso3, "\n")
-  lapply(ff, cropByGeometry, iso3, tdir)
+  lapply(ff, cropByGeometry, iso3, tdir, res)
   cat("completed", iso3, "\n")
 }
 
