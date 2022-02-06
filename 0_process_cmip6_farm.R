@@ -26,7 +26,7 @@ cropByGeometry <- function(f, iso3, tdir, res){
   v <- getData('GADM', country=iso3, level=0, path=tdir)
   v <- vect(v)
   
-  odir <- file.path(tdir, "cmip6", res)
+  odir <- file.path(tdir, "cmip6", iso3, res)
   dir.create(odir, FALSE, TRUE)
   
   ofile <- file.path(odir, paste0(iso3, "_" ,basename(f)))

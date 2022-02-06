@@ -194,7 +194,7 @@ makePlotSingle <- function(f, iso, vs, pdir){
   # vr <- vs[vs$LZNAMEF == admin,]
   # vr <- vs
   # get corresponding layer names
-  v0 <- getData("GADM", country = iso, level = 0, path = "suitability/maps")  
+  v0 <- getData("GADM", country = iso, level = 1, path = "suitability/maps")  
   
   # save masked results  
   mdir <- file.path("suitability/maps", iso, "tif")
@@ -234,6 +234,9 @@ makePlotSingle <- function(f, iso, vs, pdir){
   
   # all border 
   # start creating tmap objects  
+  v0 <- crop(v0, extent(vs)*1.25)
+  rr <- crop(rr, v0)
+  
   b0 <- tm_shape(v0) + tm_borders(lwd=1.25, col=gray(0.3), lty = "dashed")
   border1 <- tm_shape(vs) + tm_borders(lwd=2, col=gray(0.1))
   border <- b0+border1
@@ -291,7 +294,7 @@ makePlotSingle <- function(f, iso, vs, pdir){
     dev.off()
     
   } else {
-    plotbarlist <- makeChartByProvince(nrow(vr),vs,brs, suitcat, fills, xlabs = c("hist", "2030", "2050"))
+    plotbarlist <- makeChartByProvince(nrow(vs),vs,brs, suitcat, fills, xlabs = c("hist", "2030", "2050"))
     
     # for single polygon, keep legend in portrait
     plg2 <- makeSuitGroupLegend(brs[[1]],suitcat,fills, TRUE)
@@ -407,7 +410,7 @@ outdir <- "suitability"
 #####################################################################################
 # list of countries  
 # isol <- c("BDI", "GNB" ,"GIN", "HTI", "NPL", "NER", "PAK", "SOM", "TZA")
-isol <- "NGA"
+iso <- "NGA"
 
 fff <- list.files("/cluster01/workspace/CCI/Data/climateriskprofiles/results/suitability/combined", 
                   pattern = ".tif$",recursive = TRUE, full.names = TRUE)           
@@ -419,7 +422,7 @@ for (i in 1:nrow(v)){
   vs <- v[i,]  
   
   # also add the irrigation layer  
-  irr <- file.path("suitability/maps", iso, "irrigation_extent.tif")
+  irr <- file.path("~/data/suitability/maps", iso, "irrigation_extent.tif")
   if(!file.exists(irr)){
     gmia <- stack("suitability/gmia_v5_aei_pct.asc")
     v0 <- getData("GADM", country = iso, level = 0, path = "suitability/maps") 
@@ -435,6 +438,6 @@ for (i in 1:nrow(v)){
   parallel::mclapply(ff, makePlots, iso, vs, outdir, mc.preschedule = FALSE, mc.cores = 20)  
 }
 
-zip(zipfile = 'suitability/maps_wfp.zip', files = dir('suitability/maps', full.names = TRUE))
-
+# zip(zipfile = 'suitability/maps_wfp.zip', files = dir('suitability/maps', full.names = TRUE))
+# https://africalab.alliance.cgiar.org:8000/
 
